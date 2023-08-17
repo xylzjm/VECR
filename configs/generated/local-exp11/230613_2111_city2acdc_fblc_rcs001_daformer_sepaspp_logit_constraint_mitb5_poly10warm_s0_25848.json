@@ -1,0 +1,79 @@
+{
+    "_base_": [
+        "../../_base_/default_runtime.py",
+        "../../_base_/models/daformer_sepaspp_logit_constraint_mitb5.py",
+        "../../_base_/datasets/uda_cityscapes_to_acdc_640x640.py",
+        "../../_base_/uda/fblc.py",
+        "../../_base_/schedules/adamw.py",
+        "../../_base_/schedules/poly10warm.py"
+    ],
+    "n_gpus": 1,
+    "seed": 0,
+    "model": {
+        "pretrained": "pretrained/mit_b5.pth",
+        "backbone": {
+            "type": "mit_b5"
+        },
+        "decode_head": {}
+    },
+    "uda": {
+        "debug_img_interval": 1000,
+        "pseudo_threshold": 0.9,
+        "blur": true,
+        "color_jitter": true
+    },
+    "data": {
+        "samples_per_gpu": 2,
+        "workers_per_gpu": 2,
+        "train": {
+            "rare_class_sampling": {
+                "min_pixels": 3000,
+                "class_temp": 0.01,
+                "min_crop_ratio": 0.5
+            }
+        }
+    },
+    "optimizer_config": null,
+    "optimizer": {
+        "lr": 6e-05,
+        "paramwise_cfg": {
+            "custom_keys": {
+                "head": {
+                    "lr_mult": 10.0
+                },
+                "pos_block": {
+                    "decay_mult": 0.0
+                },
+                "norm": {
+                    "decay_mult": 0.0
+                }
+            }
+        }
+    },
+    "runner": {
+        "type": "IterBasedRunner",
+        "max_iters": 40000
+    },
+    "checkpoint_config": {
+        "by_epoch": false,
+        "interval": 40000,
+        "max_keep_ckpts": 1
+    },
+    "evaluation": {
+        "interval": 1000,
+        "metric": "mIoU"
+    },
+    "log_config": {
+        "interval": 50
+    },
+    "name": "230613_2111_city2acdc_fblc_rcs001_daformer_sepaspp_logit_constraint_mitb5_poly10warm_s0_25848",
+    "exp": 11,
+    "name_dataset": "cityscapes2acdc",
+    "name_architecture": "daformer_sepaspp_logit_constraint_mitb5",
+    "name_encoder": "mitb5",
+    "name_decoder": "daformer_sepaspp_logit_constraint",
+    "name_uda": "fblc_rcs0.01",
+    "name_opt": "adamw_6e-05_pmTrue_poly10warm_1x2_40k",
+    "work_dir": "/hy-tmp/result/local-exp11/230613_2111_city2acdc_fblc_rcs001_daformer_sepaspp_logit_constraint_mitb5_poly10warm_s0_25848",
+    "git_rev": "bea67c3c564bd5b545295d5091ffeeaa00da98a3"
+}
