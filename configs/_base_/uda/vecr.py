@@ -1,5 +1,5 @@
 uda = dict(
-    type='VBLC',
+    type='VECR',
     alpha=0.999,
     pseudo_threshold=0.9,
     debug_img_interval=1000,

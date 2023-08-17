@@ -1,5 +1,5 @@
 from .test_uda import TestUDA
 from .vblc import VBLC
-from .fblc import FBLC
+from .vecr import VECR
 
-__all__ = ['TestUDA', 'VBLC', 'FBLC']
+__all__ = ['TestUDA', 'VBLC', 'VECR']

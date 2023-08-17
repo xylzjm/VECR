@@ -201,7 +201,7 @@ def generate_experiment_cfgs(id):
             cfg['log_config']['interval'] = 1
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
-    # Cityscapes --> ACDC (SegFormer MiT-B5)
+    # VBLC: Cityscapes --> ACDC (SegFormer MiT-B5)
     # -------------------------------------------------------------------------
     elif id == 1:
         seeds = [0]
@@ -220,27 +220,7 @@ def generate_experiment_cfgs(id):
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
-    # Cityscapes --> ACDC (SegFormer MiT-B5)
-    # -------------------------------------------------------------------------
-    elif id == 11:
-        method_name = 'fblc'
-        seeds = [0]
-        models = [
-            ('daformer_sepaspp_logit_constraint', 'mitb5'),
-        ]
-        datasets = [
-            ('cityscapes', 'acdc')
-        ]
-        udas = ['fblc']
-        rcs_T = 0.01
-        blur = True
-        color_jitter = True
-        for (source, target), (architecture, backbone), uda, seed in \
-                itertools.product(datasets, models, udas, seeds):
-            cfg = config_from_vars()
-            cfgs.append(cfg)
-    # -------------------------------------------------------------------------
-    # Cityscapes --> ACDC (ResNet-101)
+    # VBLC: Cityscapes --> ACDC (ResNet-101)
     # -------------------------------------------------------------------------
     elif id == 2:
         seeds = [0]
@@ -260,7 +240,7 @@ def generate_experiment_cfgs(id):
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
-    # Cityscapes --> FoggyCityscapes + RainCityscapes (SegFormer MiT-B5)
+    # VBLC: Cityscapes --> FoggyCityscapes + RainCityscapes (SegFormer MiT-B5)
     # -------------------------------------------------------------------------
     elif id == 3:
         seeds = [0]
@@ -279,7 +259,7 @@ def generate_experiment_cfgs(id):
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
-    # Cityscapes --> FoggyCityscapes + RainCityscapes (ResNet-101)
+    # VBLC: Cityscapes --> FoggyCityscapes + RainCityscapes (ResNet-101)
     # -------------------------------------------------------------------------
     elif id == 4:
         seeds = [0]
@@ -293,6 +273,28 @@ def generate_experiment_cfgs(id):
         rcs_T = 0.01
         blur = True
         color_jitter = True
+        for (source, target), (architecture, backbone), uda, seed in \
+                itertools.product(datasets, models, udas, seeds):
+            cfg = config_from_vars()
+            cfgs.append(cfg)
+    # -------------------------------------------------------------------------
+    # VECR: Cityscapes --> ACDC (SegFormer MiT-B5)
+    # -------------------------------------------------------------------------
+    elif id == 11:
+        method_name = 'vecr'
+        seeds = [0]
+        models = [
+            ('daformer_sepaspp_logit_constraint', 'mitb5'),
+            ('daformer_sepaspp', 'mitb5'),
+        ]
+        datasets = [
+            ('cityscapes', 'acdc')
+        ]
+        udas = ['vecr']
+        rcs_T = 0.01
+        blur = True
+        color_jitter = True
+        iters = 1000
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
             cfg = config_from_vars()

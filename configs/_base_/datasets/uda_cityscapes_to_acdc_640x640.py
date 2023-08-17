@@ -59,21 +59,46 @@ data = dict(
         target=dict(
             type='ACDCDataset',
             data_root='/hy-tmp/data/acdc/',
-            img_dir='rgb_anon/train',
-            ann_dir='gt/train',
+            img_dir=[
+                'rgb_anon/fog/train',
+                'rgb_anon/night/train',
+                'rgb_anon/rain/train',
+                'rgb_anon/snow/train',
+            ],
+            ann_dir=[
+                'gt/fog/train',
+                'gt/night/train',
+                'gt/rain/train',
+                'gt/snow/train',
+            ],
             pipeline=acdc_train_pipeline)),
     val=dict(
         type='ACDCDataset',
         data_root='/hy-tmp/data/acdc/',
-        img_dir='rgb_anon/val',
-        ann_dir='gt/val',
-        # separate_eval=False,
+        img_dir=[
+            'rgb_anon/fog/val',
+            'rgb_anon/night/val',
+            'rgb_anon/rain/val',
+            'rgb_anon/snow/val',
+        ],
+        ann_dir=[
+            'gt/fog/val',
+            'gt/night/val',
+            'gt/rain/val',
+            'gt/snow/val',
+        ],
+        separate_eval=False,
         pipeline=test_pipeline),
     test=dict(
         type='ACDCDataset',
         data_root='/hy-tmp/data/acdc/',
-        img_dir='rgb_anon/test',
-        # separate_eval=False,
+        img_dir=[
+            'rgb_anon/fog/test',
+            'rgb_anon/night/test',
+            'rgb_anon/rain/test',
+            'rgb_anon/snow/test',
+        ],
+        separate_eval=False,
         test_mode=True,
         pipeline=test_pipeline)
 )

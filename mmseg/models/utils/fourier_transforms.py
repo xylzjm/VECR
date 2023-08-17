@@ -6,9 +6,9 @@ from .dacs_transforms import denorm_, renorm_
 from mmcv.utils import print_log
 
 
-def fourier_transform(data, mean, std, ratio=0.01):
+def fourier_transform(data, mean, std, ratio=0.001):
     denorm_(data, mean, std)
-    data = amplitude_copypaste(data[0], data[1], ratio)
+    data = amplitude_mixup(data[0], data[1], ratio)
     renorm_(data, mean, std)
     return data
 
@@ -37,21 +37,21 @@ def ifftshift(x: torch.Tensor, dim=None):
     return torch.roll(x, shift, dim)
 
 
-def get_paste_bbox(amp, ratio):
+def get_mix_bbox(amp, ratio):
     _, h, w = amp.shape
     b = np.floor(np.amin((h, w)) * ratio).astype(int)
     c_b = np.floor(b / 2.0).astype(int)
     c_h = np.floor(h / 2.0).astype(int)
     c_w = np.floor(w / 2.0).astype(int)
 
-    h1, h2 = c_h - c_b, c_h + c_b
-    w1, w2 = c_w - c_b, c_w + c_b
+    h1, h2 = c_h - c_b, c_h + c_b + 1
+    w1, w2 = c_w - c_b, c_w + c_b + 1
     # print_log(f'amp shape: {img1_amp.shape}', 'mmseg')
     # print_log(f'h1: {h1}, h2: {h2}, w1: {w1}, w2: {w2}', 'mmseg')
     return h1, h2, w1, w2
 
 
-def amplitude_copypaste(img1, img2, ratio):
+def amplitude_mixup(img1, img2, ratio):
     """Input image size: tensor of [C, H, W]"""
     assert img1.shape == img2.shape
 
@@ -60,14 +60,14 @@ def amplitude_copypaste(img1, img2, ratio):
 
     img1_amp, img1_pha = torch.abs(img1_fft), torch.angle(img1_fft)
     img2_amp, img2_pha = torch.abs(img2_fft), torch.angle(img2_fft)
-    h1, h2, w1, w2 = get_paste_bbox(img1_amp, ratio)
+    h1, h2, w1, w2 = get_mix_bbox(img1_amp, ratio)
 
     img1_amp = fftshift(img1_amp, dim=(-2, -1))
     img2_amp = fftshift(img2_amp, dim=(-2, -1))
 
     img1_amp_, img2_amp_ = torch.clone(img1_amp), torch.clone(img2_amp)
     img1_amp[..., h1:h2, w1:w2] = (
-        0.3 * img2_amp_[..., h1:h2, w1:w2] + (1 - 0.3) * img1_amp_[..., h1:h2, w1:w2]
+        0.7 * img2_amp_[..., h1:h2, w1:w2] + (1 - 0.7) * img1_amp_[..., h1:h2, w1:w2]
     )
 
     img1_amp = ifftshift(img1_amp, dim=(-2, -1))
