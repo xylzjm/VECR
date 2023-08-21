@@ -29,9 +29,9 @@ from mmseg.models.utils.visualization import subplotimg
 
 
 @UDA.register_module()
-class VECR(UDADecorator):
+class DACS(UDADecorator):
     def __init__(self, **cfg):
-        super(VECR, self).__init__(**cfg)
+        super(DACS, self).__init__(**cfg)
         self.local_iter = 0
         self.debug_img_interval = cfg.get('debug_img_interval', None)
         self.ignore_index = 255
