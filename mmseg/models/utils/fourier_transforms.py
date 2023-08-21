@@ -6,7 +6,7 @@ from .dacs_transforms import denorm_, renorm_
 from mmcv.utils import print_log
 
 
-def fourier_transform(data, mean, std, ratio=0.001):
+def fourier_transform(data, mean, std, ratio=0.01):
     denorm_(data, mean, std)
     data = amplitude_mixup(data[0], data[1], ratio)
     renorm_(data, mean, std)
@@ -67,7 +67,7 @@ def amplitude_mixup(img1, img2, ratio):
 
     img1_amp_, img2_amp_ = torch.clone(img1_amp), torch.clone(img2_amp)
     img1_amp[..., h1:h2, w1:w2] = (
-        0.7 * img2_amp_[..., h1:h2, w1:w2] + (1 - 0.7) * img1_amp_[..., h1:h2, w1:w2]
+        0.3 * img2_amp_[..., h1:h2, w1:w2] + (1 - 0.3) * img1_amp_[..., h1:h2, w1:w2]
     )
 
     img1_amp = ifftshift(img1_amp, dim=(-2, -1))
