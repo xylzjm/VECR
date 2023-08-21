@@ -294,7 +294,26 @@ def generate_experiment_cfgs(id):
         rcs_T = 0.01
         blur = True
         color_jitter = True
-        iters = 1000
+        for (source, target), (architecture, backbone), uda, seed in \
+                itertools.product(datasets, models, udas, seeds):
+            cfg = config_from_vars()
+            cfgs.append(cfg)
+    # -------------------------------------------------------------------------
+    # VECR: Cityscapes --> ACDC (SegFormer MiT-B5) Ablation Studies
+    # -------------------------------------------------------------------------
+    elif id == 41:
+        method_name = 'dacs'
+        seeds = [0]
+        models = [
+            ('daformer_sepaspp_logit_constraint', 'mitb5'),
+        ]
+        datasets = [
+            ('cityscapes', 'acdc')
+        ]
+        udas = ['dacs']
+        rcs_T = 0.01
+        blur = True
+        color_jitter = True
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
             cfg = config_from_vars()
