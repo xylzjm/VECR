@@ -168,7 +168,7 @@ class VECR(UDADecorator):
         log_vars.update(add_prefix(src_log_vars, f'src'))
         src_loss.backward()
 
-        # generate target pseudo label from aux model
+        # generate target pseudo label from ema model
         tgt_logits = self.get_ema_model().encode_decode(tgt_fb_img, tgt_img_metas)
         tgt_softmax = torch.softmax(tgt_logits.detach(), dim=1)
         tgt_prob, pseudo_label = torch.max(tgt_softmax, dim=1)

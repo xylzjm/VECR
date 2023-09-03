@@ -87,18 +87,23 @@ def generate_experiment_cfgs(id):
         architecture_mod = architecture
         model_base = get_model_base(architecture_mod, backbone)
         cfg['_base_'].append(model_base)
-        if pretrained_source is not None:
-            cfg['load_from'] = f'pretrained/{pretrained_source}_src_only.pth'
         cfg['model'] = {
             'pretrained': get_pretraining_file(backbone),
             'backbone': get_backbone_cfg(backbone),
         }
+        if pretrained_source is not None:
+            cfg['model']['pretrained'] = f'pretrained/{pretrained_source}.pth'
         cfg = update_decoder_in_channels(cfg, architecture_mod, backbone)
 
         # Setup UDA config
-        cfg['_base_'].append(
-            f'_base_/datasets/uda_{source}_to_{target}_{crop}{suffix}.py')  # unified dataloader
-        cfg['_base_'].append(f'_base_/uda/{uda}.py')
+        if uda == 'target-only':
+            cfg['_base_'].append(f'_base_/datasets/{target}_test_{target}_{crop}{suffix}.py')
+        elif uda == 'source-only':
+            cfg['_base_'].append(f'_base_/datasets/{source}_test_{source}_{crop}{suffix}.py')
+        else:
+            cfg['_base_'].append(
+                f'_base_/datasets/uda_{source}_to_{target}_{crop}{suffix}.py')  # unified dataloader
+            cfg['_base_'].append(f'_base_/uda/{uda}.py')
         if method_name in uda:
             cfg.setdefault('uda', {})
             cfg['uda']['debug_img_interval'] = debug_img_interval
@@ -280,7 +285,7 @@ def generate_experiment_cfgs(id):
     # -------------------------------------------------------------------------
     # VECR: Cityscapes --> ACDC (SegFormer MiT-B5)
     # -------------------------------------------------------------------------
-    elif id == 11:
+    elif id == 40:
         method_name = 'vecr'
         seeds = [0]
         models = [
@@ -314,6 +319,19 @@ def generate_experiment_cfgs(id):
         rcs_T = 0.01
         blur = True
         color_jitter = True
+        for (source, target), (architecture, backbone), uda, seed in \
+                itertools.product(datasets, models, udas, seeds):
+            cfg = config_from_vars()
+            cfgs.append(cfg)
+    elif id == 500:
+        seeds = [0]
+        models = [
+            ('daformer_sepaspp', 'mitb5'),
+        ]
+        datasets = [
+            ('cityscapes', 'acdc')
+        ]
+        udas = ['source-only']
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
             cfg = config_from_vars()
