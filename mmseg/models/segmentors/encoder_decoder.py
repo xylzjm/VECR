@@ -79,7 +79,7 @@ class EncoderDecoder(BaseSegmentor):
         x = self.backbone(img)
         if self.with_neck:
             x = self.neck(x)
-        return self._decode_head_forward_bottlefeat(x)
+        return self.decode_head.align_bottlefeat(x)
 
     def extract_semantic_aware_feat(self, img, gt_semantic_seg):
         x = self.backbone(img, gt_semantic_seg)
@@ -119,9 +119,6 @@ class EncoderDecoder(BaseSegmentor):
         if isinstance(seg_logits, dict):
             seg_logits = seg_logits['out']
         return seg_logits
-
-    def _decode_head_forward_bottlefeat(self, x, img_metas):
-        return self.decode_head.align_bottlefeat(x)
 
     def _auxiliary_head_forward_train(self, x, img_metas, gt_semantic_seg):
         """Run forward function and calculate loss for auxiliary head in

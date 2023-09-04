@@ -1,3 +1,5 @@
 pretrained/
 pretrained/mit_b5.pth
 configs/generated/
+work_dirs/
+**/__pycache__

@@ -13,7 +13,7 @@ class prototype_dist_estimator:
 
         self.class_num = cfg['class_num']
         self.feat_num = cfg['feat_num']
-        self.ignore_idx = cfg['ignore_idx']
+        self.ignore_idx = cfg['ignore_index']
         self.use_momentum = cfg['use_momentum']
         self.momentum = cfg['momentum']
 
@@ -22,6 +22,7 @@ class prototype_dist_estimator:
             ckpt = torch.load(resume, map_location='cpu')
             self.Proto = ckpt['Proto'].cuda(non_blocking=True)
             self.Amount = ckpt['Amount'].cuda(non_blocking=True)
+            assert self.Proto.shape == (self.class_num, self.feat_num)
         else:
             self.Proto = torch.zeros(self.class_num, self.feat_num).cuda(
                 non_blocking=True
@@ -64,7 +65,9 @@ class prototype_dist_estimator:
                 )
 
     def save(self, name):
+        file = osp.join('pretrained/', name)
         torch.save(
             {'Proto': self.Proto.cpu(), 'Amount': self.Amount.cpu()},
-            osp.join('pretrained/', name),
+            file,
         )
+        mmcv.print_log(f'save initialized prototype on: {file}', 'mmseg')

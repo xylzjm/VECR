@@ -15,6 +15,13 @@
         },
         "decode_head": {}
     },
+    "proto": {
+        "feat_num": 1024,
+        "class_num": 19,
+        "ignore_index": 255,
+        "use_momentum": false,
+        "momentum": 0.9
+    },
     "data": {
         "samples_per_gpu": 2,
         "workers_per_gpu": 2,
