@@ -92,7 +92,7 @@ def generate_experiment_cfgs(id):
             'backbone': get_backbone_cfg(backbone),
         }
         if pretrained_source is not None:
-            cfg['model']['pretrained'] = f'pretrained/{pretrained_source}.pth'
+            cfg['model']['pretrained'] = pretrained_source
         cfg = update_decoder_in_channels(cfg, architecture_mod, backbone)
 
         # Setup UDA config
@@ -283,7 +283,7 @@ def generate_experiment_cfgs(id):
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
-    # VECR: Cityscapes --> ACDC (SegFormer MiT-B5)
+    # VECR: Cityscapes --> ACDC (SegFormer MiT-B5) 第四章VECR模型
     # -------------------------------------------------------------------------
     elif id == 40:
         method_name = 'vecr'
@@ -335,6 +335,29 @@ def generate_experiment_cfgs(id):
             ('cityscapes', 'acdc')
         ]
         udas = ['source-only']
+        for (source, target), (architecture, backbone), uda, seed in \
+                itertools.product(datasets, models, udas, seeds):
+            cfg = config_from_vars()
+            cfgs.append(cfg)
+    # -------------------------------------------------------------------------
+    # VECR: Cityscapes --> ACDC (SegFormer MiT-B5) 第五章ProG-VECR模型
+    # -------------------------------------------------------------------------
+    elif id == 50:
+        method_name = 'prog_vecr'
+        pretrained_source = 'pretrained/source_warmup_daformer.pth'
+        seeds = [0]
+        models = [
+            ('daformer_sepaspp_logit_constraint', 'mitb5'),
+            # ('daformer_sepaspp', 'mitb5'),
+        ]
+        datasets = [
+            ('cityscapes', 'acdc')
+        ]
+        udas = ['prog_vecr']
+        pseudo_threshold = None
+        rcs_T = 0.01
+        blur = True
+        color_jitter = True
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
             cfg = config_from_vars()

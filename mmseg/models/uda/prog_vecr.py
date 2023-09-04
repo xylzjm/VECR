@@ -26,12 +26,13 @@ from mmseg.models.utils.visualization import subplotimg
 
 
 @UDA.register_module()
-class PROG_VECR(VECR):
+class ProG_VECR(VECR):
     def __init__(self, **cfg):
-        super(PROG_VECR, self).__init__(**cfg)
+        super(ProG_VECR, self).__init__(**cfg)
         self.proto_cfg = cfg['proto']
         self.proto_resume = cfg['proto_resume']
         self.feat_estimator = None
+        self.pseudo_threshold = None
 
     def calculate_pseudo_weight(self, Proto, feat, pseudo_label):
         """
@@ -51,8 +52,8 @@ class PROG_VECR(VECR):
         feat = F.normalize(feat, p=2, dim=1)
         Proto = F.normalize(Proto, p=2, dim=1)
 
-        w = (feat @ Proto.permute(1, 0).contiguous()) / 50.0
-        w = w.softmax(dim=1)
+        weight = (feat @ Proto.permute(1, 0).contiguous()) / 50.0
+        weight = weight.softmax(dim=1)
 
         pseudo_weight = w.view(b, h, w, c).permute(0, 3, 1, 2)
         pseudo_weight = pseudo_weight.gather(1, pseudo_label)
