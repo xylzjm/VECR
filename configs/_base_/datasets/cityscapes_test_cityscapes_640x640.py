@@ -52,4 +52,5 @@ data = dict(
         data_root=data_root,
         img_dir='leftImg8bit/test',
         ann_dir='gtFine/test',
+        test_mode=True,
         pipeline=test_pipeline))
