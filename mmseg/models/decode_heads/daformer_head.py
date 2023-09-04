@@ -169,7 +169,7 @@ class DAFormerHead(BaseDecodeHead):
         self.fuse_layer = build_layer(
             sum(embed_dims), self.channels, **fusion_cfg)
 
-    def forward(self, inputs):
+    def align_bottlefeat(self, inputs):
         x = inputs
         n, _, h, w = x[-1].shape
         # for f in x:
@@ -191,8 +191,15 @@ class DAFormerHead(BaseDecodeHead):
                     size=os_size,
                     mode='bilinear',
                     align_corners=self.align_corners)
-
-        x = self.fuse_layer(torch.cat(list(_c.values()), dim=1))
-        x = self.cls_seg(x)
-
-        return x
+        return torch.cat(list(_c.values()), dim=1)
+    
+    def forward(self, inputs, return_feat=False):
+        
+        bottlefeat = self.align_bottlefeat(inputs)
+        if return_feat:
+            out_dict = {}
+            out_dict['feat'] = bottlefeat
+            out_dict['out'] = self.cls_seg(self.fuse_layer(bottlefeat))
+            return out_dict
+        else:
+            return self.cls_seg(self.fuse_layer(bottlefeat))

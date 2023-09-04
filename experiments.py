@@ -323,6 +323,9 @@ def generate_experiment_cfgs(id):
                 itertools.product(datasets, models, udas, seeds):
             cfg = config_from_vars()
             cfgs.append(cfg)
+    # -------------------------------------------------------------------------
+    # VECR: Cityscapes (Daformer MiT-B5) Source Warmup
+    # -------------------------------------------------------------------------
     elif id == 500:
         seeds = [0]
         models = [
