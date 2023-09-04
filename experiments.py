@@ -92,7 +92,7 @@ def generate_experiment_cfgs(id):
             'backbone': get_backbone_cfg(backbone),
         }
         if pretrained_source is not None:
-            cfg['model']['pretrained'] = pretrained_source
+            cfg['load_from'] = pretrained_source
         cfg = update_decoder_in_channels(cfg, architecture_mod, backbone)
 
         # Setup UDA config

@@ -1,28 +1,26 @@
 import os
 import random
-from copy import deepcopy
 
 import matplotlib.pyplot as plt
-from timm.models.layers import DropPath
-from torch.nn.modules.dropout import _DropoutNd
+import mmcv
 import torch
 import torch.nn.functional as F
-import numpy as np
-
 from mmseg.core import add_prefix
-from mmseg.models import UDA, build_segmentor
+from mmseg.models import UDA
 from mmseg.models.uda.vecr import VECR
-
 from mmseg.models.utils.dacs_transforms import (
     denorm,
     get_class_masks,
     get_mean_std,
     strong_transform,
 )
-from mmseg.models.utils.night_fog_filter import night_fog_filter
 from mmseg.models.utils.fourier_transforms import fourier_transform
+from mmseg.models.utils.night_fog_filter import night_fog_filter
 from mmseg.models.utils.prototype_dist_estimator import prototype_dist_estimator
 from mmseg.models.utils.visualization import subplotimg
+from mmseg.ops import resize
+from timm.models.layers import DropPath
+from torch.nn.modules.dropout import _DropoutNd
 
 
 @UDA.register_module()
@@ -34,31 +32,59 @@ class ProG_VECR(VECR):
         self.feat_estimator = None
         self.pseudo_threshold = None
 
+    def update_prototype_statistics(self, src_img, tgt_img, src_label, tgt_label):
+        src_emafeat = self.get_ema_model().extract_bottlefeat(src_img)
+        tgt_emafeat = self.get_ema_model().extract_bottlefeat(tgt_img)
+        b, a, hs, ws = src_emafeat.shape
+        _, _, ht, wt = tgt_emafeat.shape
+        src_emafeat = src_emafeat.permute(0, 2, 3, 1).contiguous().view(b * hs * ws, a)
+        tgt_emafeat = tgt_emafeat.permute(0, 2, 3, 1).contiguous().view(b * ht * wt, a)
+
+        src_mask = (
+            resize(src_label.float(), size=(hs, ws), mode='nearest')
+            .long()
+            .contiguous()
+            # fmt: off
+            .view(b * hs * ws, )
+            # fmt: on
+        )
+        tgt_mask = (
+            resize(tgt_label.float(), size=(ht, wt), mode='nearest')
+            .long()
+            .contiguous()
+            # fmt: off
+            .view(b * ht * wt, )
+            # fmt: on
+        )
+
+        self.feat_estimator.update(feat=tgt_emafeat.detach(), label=tgt_mask)
+        self.feat_estimator.update(feat=src_emafeat.detach(), label=src_mask)
+
     def calculate_pseudo_weight(self, Proto, feat, pseudo_label):
         """
         Args:
             C means NUM_CLASS, A means feature dim.
             Proto: shape of (C, A), the mean representation of each class.
             feat: shape of (B, A, H, W).
-            pseudo_label: shape of (B, 1, H, W).
+            pseudo_label: shape of (B, H, W).
 
             Return: pixel-wise pseudo weight, which is shape of (B, H, W)
         """
         b, a, h, w = feat.shape
         c, _ = Proto.shape
-        assert pseudo_label.shape == (b, 1, h, w)
+        assert pseudo_label.shape == (b, h, w)
 
         feat = feat.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
         feat = F.normalize(feat, p=2, dim=1)
         Proto = F.normalize(Proto, p=2, dim=1)
 
-        weight = (feat @ Proto.permute(1, 0).contiguous()) / 50.0
+        weight = feat @ Proto.permute(1, 0).contiguous()
         weight = weight.softmax(dim=1)
 
-        pseudo_weight = w.view(b, h, w, c).permute(0, 3, 1, 2)
-        pseudo_weight = pseudo_weight.gather(1, pseudo_label)
+        pseudo_weight = weight.view(b, h, w, c).permute(0, 3, 1, 2)
+        pseudo_weight = pseudo_weight.gather(1, pseudo_label.unsqueeze(1))
 
-        return pseudo_weight
+        return pseudo_weight.squeeze(1)
 
     def forward_train(self, img, img_metas, gt_semantic_seg, return_feat=False):
         log_vars = {}
@@ -119,6 +145,11 @@ class ProG_VECR(VECR):
         log_vars.update(add_prefix(src_log_vars, f'src'))
         src_loss.backward()
 
+        # update feature statistics
+        self.update_prototype_statistics(
+            src_img, tgt_img, src_gt_semantic_seg, tgt_gt_semantic_seg
+        )
+
         # generate target pseudo label from ema model
         tgt_outputs = self.get_ema_model().encode_decode_bottlefeat(
             tgt_fb_img, tgt_img_metas
@@ -129,30 +160,11 @@ class ProG_VECR(VECR):
         pseudo_weight = self.calculate_pseudo_weight(
             Proto=self.feat_estimator.Proto.detach(),
             feat=tgt_feat,
-            pseudo_label=pseudo_label.unsqueeze(1),
+            pseudo_label=pseudo_label,
         )
+        # mmcv.print_log(f'pseudo_weight shape: {pseudo_weight.shape}', 'mmseg')
         gt_pixel_weight = torch.ones(pseudo_weight.shape, device=dev)
-        del tgt_outputs, tgt_feat, tgt_logits
-
-        # update feature statistics
-        src_emafeat = self.get_ema_model().extract_bottlefeat(src_img)
-        tgt_emafeat = self.get_ema_model().extract_bottlefeat(tgt_img)
-        b, a, hs, ws = src_emafeat.shape
-        _, _, ht, wt = tgt_emafeat.shape
-        src_emafeat = src_emafeat.permute(0, 2, 3, 1).contiguous().view(b * hs * ws, a)
-        tgt_emafeat = tgt_emafeat.permute(0, 2, 3, 1).contiguous().view(b * ht * wt, a)
-        self.feat_estimator.update(
-            feat=tgt_emafeat.detach(),
-            label=pseudo_label.contiguous().view(
-                b * ht * wt,
-            ),
-        )
-        self.feat_estimator.update(
-            feat=src_emafeat.detach(),
-            label=src_gt_semantic_seg.contiguous().view(
-                b * hs * ws,
-            ),
-        )
+        del tgt_outputs, tgt_feat, tgt_logits, tgt_softmax
 
         # prepare for dacs transforms
         strong_parameters = {

@@ -4,6 +4,7 @@
 import argparse
 
 import torch
+from mmseg.core import add_prefix
 
 # import subprocess
 
@@ -13,11 +14,12 @@ def parse_args():
         description='Process a checkpoint to be published')
     parser.add_argument('in_file', help='input checkpoint filename')
     parser.add_argument('out_file', help='output checkpoint filename')
+    parser.add_argument('--prefix', default=None, help='prefix the checkpoint')
     args = parser.parse_args()
     return args
 
 
-def process_checkpoint(in_file, out_file):
+def process_checkpoint(in_file, out_file, prefix):
     checkpoint = torch.load(in_file, map_location='cpu')
     # remove optimizer for smaller file size
     if 'optimizer' in checkpoint:
@@ -30,6 +32,8 @@ def process_checkpoint(in_file, out_file):
     # add the code here.
     if 'meta' in checkpoint:
         del checkpoint['meta']
+    if prefix is not None:
+        checkpoint['state_dict'] = add_prefix(checkpoint['state_dict'], prefix)
     # inspect checkpoint
     print('Checkpoint keys:', checkpoint.keys())
     print('Checkpoint state_dict keys:', checkpoint['state_dict'].keys())
@@ -42,7 +46,7 @@ def process_checkpoint(in_file, out_file):
 
 def main():
     args = parse_args()
-    process_checkpoint(args.in_file, args.out_file)
+    process_checkpoint(args.in_file, args.out_file, args.prefix)
 
 
 if __name__ == '__main__':
