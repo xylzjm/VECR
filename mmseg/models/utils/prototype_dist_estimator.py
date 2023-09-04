@@ -30,10 +30,11 @@ class prototype_dist_estimator:
             self.Amount = torch.zeros(self.class_num).cuda(non_blocking=True)
 
     def update(self, feat, label):
-        mask = label != self.ignore_idx
         # remove IGNORE_LABEL pixels
+        mask = label != self.ignore_idx
         label = label[mask]
         feat = feat[mask]
+        
         if not self.use_momentum:
             N, A = feat.shape
             C = self.class_num

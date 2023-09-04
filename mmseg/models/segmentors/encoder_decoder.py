@@ -99,6 +99,18 @@ class EncoderDecoder(BaseSegmentor):
             align_corners=self.align_corners)
         return out
 
+    def encode_decode_bottlefeat(self, img, img_metas):
+        x = self.extract_feat(img)
+        out = self._decode_head_forward_bottlefeat(x, img_metas)
+        assert isinstance(out, dict)
+        for _n, _v in out.items():
+            out[_n] = resize(
+                input=_v,
+                size=img.shape[2:],
+                mode='bilinear',
+                align_corners=self.align_corners)
+        return out
+
     def _decode_head_forward_train(self, x, img_metas, gt_semantic_seg, seg_weight=None, **kwargs):
         """Run forward function and calculate loss for decode head in
         training."""
@@ -119,6 +131,9 @@ class EncoderDecoder(BaseSegmentor):
         if isinstance(seg_logits, dict):
             seg_logits = seg_logits['out']
         return seg_logits
+    
+    def _decode_head_forward_bottlefeat(self, x, img_metas):
+        return self.decode_head.forward_bottlefeat(x, img_metas)
 
     def _auxiliary_head_forward_train(self, x, img_metas, gt_semantic_seg):
         """Run forward function and calculate loss for auxiliary head in

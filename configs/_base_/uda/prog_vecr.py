@@ -9,6 +9,7 @@ uda = dict(
         class_num=19,
         ignore_index=255,
         use_momentum=False,
-        momentum=0.9)
+        momentum=0.9),
+    proto_resume='pretrained/prototype_source_initial_value.pth'
 )
 use_ddp_wrapper = True
