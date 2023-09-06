@@ -121,6 +121,9 @@ class EncoderDecoder(BaseSegmentor):
                                                      seg_weight,
                                                      **kwargs)
 
+        bottlefeat = loss_decode.pop('bottlefeat', None)
+        if bottlefeat is not None:
+            losses['bottlefeat'] = bottlefeat
         losses.update(add_prefix(loss_decode, 'decode'))
         return losses
 

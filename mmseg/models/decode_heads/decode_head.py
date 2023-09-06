@@ -203,8 +203,14 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         Returns:
             dict[str, Tensor]: a dictionary of loss components
         """
-        seg_logits = self.forward(inputs)
-        losses = self.losses(seg_logits, gt_semantic_seg, seg_weight, **kwargs)
+
+        outputs = self.forward(inputs, **kwargs)
+        if isinstance(outputs, dict):
+            seg_logits = outputs['out']
+            losses = self.losses(seg_logits, gt_semantic_seg, seg_weight, **kwargs)
+            losses['bottlefeat'] = outputs['feat']
+        else:
+            losses = self.losses(outputs, gt_semantic_seg, seg_weight, **kwargs)
         return losses
 
     def forward_test(self, inputs, img_metas, test_cfg):

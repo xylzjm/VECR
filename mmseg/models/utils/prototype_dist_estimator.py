@@ -7,11 +7,12 @@ class prototype_dist_estimator:
     def __init__(
         self,
         cfg,
+        class_num,
         resume=None,
     ):
         super(prototype_dist_estimator, self).__init__()
 
-        self.class_num = cfg['class_num']
+        self.class_num = class_num
         self.feat_num = cfg['feat_num']
         self.ignore_idx = cfg['ignore_index']
         self.use_momentum = cfg['use_momentum']

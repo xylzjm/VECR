@@ -193,10 +193,10 @@ class DAFormerHead(BaseDecodeHead):
                     align_corners=self.align_corners)
         return torch.cat(list(_c.values()), dim=1)
     
-    def forward(self, inputs, return_feat=False):
+    def forward(self, inputs, get_bottlefeat=False):
         
         bottlefeat = self.align_bottlefeat(inputs)
-        if return_feat:
+        if get_bottlefeat:
             out_dict = {}
             out_dict['feat'] = bottlefeat
             out_dict['out'] = self.cls_seg(self.fuse_layer(bottlefeat))
