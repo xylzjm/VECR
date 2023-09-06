@@ -42,7 +42,7 @@ def prototype_initialize(model, data_loader, device, cfg):
             for _ in range(B):
                 prog_bar.update()
         mmcv.print_log('')
-        feat_estimator.save('prototype_initial_value.pth')        
+        feat_estimator.save('prototype_initial_value.pth')
 
 
 def main():
@@ -88,7 +88,12 @@ def main():
     model = build_segmentor(
         cfg.model, train_cfg=cfg.get('train_cfg'), test_cfg=cfg.get('test_cfg')
     )
-    load_checkpoint(model, args.checkpoint, map_location='cpu')
+    load_checkpoint(
+        model,
+        args.checkpoint,
+        map_location='cpu',
+        revise_keys=[(r'^module\.', ''), ('model.', '')],
+    )
     model = MMDataParallel(model, device_ids=cfg.gpu_ids)
 
     prototype_initialize(model, data_loader, cfg.gpu_ids, cfg)
