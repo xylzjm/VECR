@@ -42,7 +42,7 @@ def prototype_initialize(model, data_loader, device, cfg):
             for _ in range(B):
                 prog_bar.update()
         mmcv.print_log('')
-        feat_estimator.save('prototype_initial_value.pth')
+        feat_estimator.save('pretrained/prototype_source_initial_value.pth')
 
 
 def main():
@@ -66,6 +66,7 @@ def main():
         mmcv.print_log(f'Set random seed to {args.seed}', 'mmseg')
         set_random_seed(args.seed, deterministic=False)
     cfg.seed = args.seed
+    # set gup id
     if args.gpu_id is not None:
         cfg.gpu_ids = [args.gpu_id]
 
