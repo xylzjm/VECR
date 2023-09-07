@@ -286,7 +286,6 @@ def generate_experiment_cfgs(id):
     # VECR: Cityscapes --> ACDC (SegFormer MiT-B5) 第四章VECR模型
     # -------------------------------------------------------------------------
     elif id == 40:
-        method_name = 'vecr'
         seeds = [0]
         models = [
             ('daformer_sepaspp_logit_constraint', 'mitb5'),
@@ -301,13 +300,13 @@ def generate_experiment_cfgs(id):
         color_jitter = True
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
+            method_name = uda
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
     # VECR: Cityscapes --> ACDC (SegFormer MiT-B5) Ablation Studies
     # -------------------------------------------------------------------------
     elif id == 41:
-        method_name = 'dacs'
         seeds = [0]
         models = [
             ('daformer_sepaspp_logit_constraint', 'mitb5'),
@@ -321,6 +320,7 @@ def generate_experiment_cfgs(id):
         color_jitter = True
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
+            method_name = uda
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
@@ -343,7 +343,6 @@ def generate_experiment_cfgs(id):
     # ProG-VECR: Cityscapes --> ACDC (SegFormer MiT-B5) 第五章ProG-VECR模型
     # -------------------------------------------------------------------------
     elif id == 50:
-        method_name = 'prog_vecr'
         pretrained_source = 'pretrained/source_warmup_daformer.pth'
         seeds = [0]
         models = [
@@ -360,13 +359,13 @@ def generate_experiment_cfgs(id):
         color_jitter = True
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
+            method_name = uda
             cfg = config_from_vars()
             cfgs.append(cfg)
     # -------------------------------------------------------------------------
     # ProG-VECR: Cityscapes --> ACDC (SegFormer MiT-B5) Ablation Studies
     # -------------------------------------------------------------------------
-    elif id == 52:
-        method_name = 'vecr'
+    elif id == 51:
         pretrained_source = 'pretrained/source_warmup_daformer.pth'
         seeds = [0]
         models = [
@@ -376,12 +375,17 @@ def generate_experiment_cfgs(id):
         datasets = [
             ('cityscapes', 'acdc')
         ]
-        udas = ['vecr']
+        udas = [
+            'prog_vecr',
+            'prog_vecr_srcorice_srcstyce_tgtorice_tgtstyce'
+        ]
+        pseudo_threshold = None
         rcs_T = 0.01
         blur = True
         color_jitter = True
         for (source, target), (architecture, backbone), uda, seed in \
                 itertools.product(datasets, models, udas, seeds):
+            method_name = uda
             cfg = config_from_vars()
             cfgs.append(cfg)
     else:

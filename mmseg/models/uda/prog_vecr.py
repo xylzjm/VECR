@@ -288,9 +288,7 @@ class ProG_VECR(VECR):
 
         # dacs mixed target
         mix_masks = get_class_masks(src_gt_semantic_seg)
-        mixed_img = [None] * len(self.stylization['target']['ce'])
-        mixed_lbl, feats_pool = [None] * batch_size, {}
-        tgt_inv_flag = self.stylization['target']['consist'] is not None
+        mixed_lbl = [None] * batch_size
         for i in range(batch_size):
             strong_parameters['mix'] = mix_masks[i]
             _, mixed_lbl[i] = strong_transform(
@@ -302,6 +300,11 @@ class ProG_VECR(VECR):
                 target=torch.stack((gt_pixel_weight[i], pseudo_weight[i])),
             )
         mixed_lbl = torch.cat(mixed_lbl)
+
+        # train main model with target
+        mixed_img = [None] * len(self.stylization['target']['ce'])
+        tgt_inv_flag = self.stylization['target']['consist'] is not None
+        feats_pool = {}
         for j, ce_args in enumerate(self.stylization['target']['ce']):
             mixed_img[j] = [None] * batch_size
             if ce_args[0] == 'original':
@@ -322,8 +325,7 @@ class ProG_VECR(VECR):
                     strong_parameters, data=torch.stack((src_stdby[i], tgt_stdby[i]))
                 )
             mixed_img[j] = torch.cat(mixed_img[j])
-
-            # train main model with target
+            # train on mixed images
             mix_losses = self.get_model().forward_train(
                 mixed_img[j],
                 tgt_img_metas,
@@ -370,8 +372,8 @@ class ProG_VECR(VECR):
                     # fmt: on
             assert len(feats_pool) == len(self.stylization['target']['consist'])
             tgt_inv_loss, tgt_inv_log = self.calculate_feat_invariance(
-                list(feats_pool.values())[0],
-                list(feats_pool.values())[1],
+                feats_pool[self.stylization['target']['consist'][0]],
+                feats_pool[self.stylization['target']['consist'][1]],
                 proto=self.feat_estimator.Proto.detach(),
                 source=False,
             )
@@ -445,6 +447,10 @@ class ProG_VECR(VECR):
                 mix_softmax = torch.softmax(mix_logits.detach(), dim=1)
                 _, mix_fb_label_test = torch.max(mix_softmax, dim=1)
                 mix_fb_label_test = mix_fb_label_test.unsqueeze(1)
+            # fmt: off
+            del (src_logits, src_softmax, tgt_logits,
+                 tgt_softmax, mix_logits, mix_softmax)
+            # fmt: on
 
             for j in range(batch_size):
                 rows, cols = 3, 6
