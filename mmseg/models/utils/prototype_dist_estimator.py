@@ -7,13 +7,12 @@ class prototype_dist_estimator:
     def __init__(
         self,
         cfg,
-        class_num,
         resume=None,
     ):
         super(prototype_dist_estimator, self).__init__()
 
-        self.class_num = class_num
-        self.feat_num = cfg['feat_num']
+        self.num_class = cfg['num_class']
+        self.feat_dim = cfg['feat_dim']
         self.ignore_idx = cfg['ignore_index']
         self.use_momentum = cfg['use_momentum']
         self.momentum = cfg['momentum']
@@ -23,12 +22,12 @@ class prototype_dist_estimator:
             ckpt = torch.load(resume, map_location='cpu')
             self.Proto = ckpt['Proto'].cuda(non_blocking=True)
             self.Amount = ckpt['Amount'].cuda(non_blocking=True)
-            assert self.Proto.shape == (self.class_num, self.feat_num)
+            assert self.Proto.shape == (self.num_class, self.feat_dim)
         else:
-            self.Proto = torch.zeros(self.class_num, self.feat_num).cuda(
+            self.Proto = torch.zeros(self.num_class, self.feat_dim).cuda(
                 non_blocking=True
             )
-            self.Amount = torch.zeros(self.class_num).cuda(non_blocking=True)
+            self.Amount = torch.zeros(self.num_class).cuda(non_blocking=True)
 
     def update(self, feat, label):
         # remove IGNORE_LABEL pixels
@@ -38,7 +37,7 @@ class prototype_dist_estimator:
         
         if not self.use_momentum:
             N, A = feat.shape
-            C = self.class_num
+            C = self.num_class
             # refer to SDCA for fast implementation
             feat = feat.view(N, 1, A).expand(N, C, A)
             onehot = torch.zeros(N, C).cuda()

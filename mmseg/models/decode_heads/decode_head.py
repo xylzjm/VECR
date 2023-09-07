@@ -230,8 +230,8 @@ class BaseDecodeHead(BaseModule, metaclass=ABCMeta):
         """
         return self.forward(inputs)
 
-    def forward_bottlefeat(self, inputs, img_metas):
-        return self.forward(inputs, return_feat=True)
+    def forward_bottlefeat(self, inputs):
+        return self.forward(inputs, get_bottlefeat=True)
     
     def cls_seg(self, feat):
         """Classify each pixel."""

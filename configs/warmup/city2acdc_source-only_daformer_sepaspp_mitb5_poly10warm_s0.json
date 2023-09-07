@@ -16,8 +16,8 @@
         "decode_head": {}
     },
     "proto": {
-        "feat_num": 1024,
-        "class_num": 19,
+        "feat_dim": 1024,
+        "num_class": 19,
         "ignore_index": 255,
         "use_momentum": false,
         "momentum": 0.9

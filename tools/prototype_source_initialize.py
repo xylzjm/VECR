@@ -42,7 +42,7 @@ def prototype_initialize(model, data_loader, device, cfg):
             for _ in range(B):
                 prog_bar.update()
         mmcv.print_log('')
-        feat_estimator.save('pretrained/prototype_source_initial_value.pth')
+        feat_estimator.save('prototype_source_initial_value.pth')
 
 
 def main():

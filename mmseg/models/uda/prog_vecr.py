@@ -4,7 +4,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 
-# import mmcv
+import mmcv
 import torch
 import torch.nn.functional as F
 from mmseg.core import add_prefix
@@ -29,16 +29,24 @@ from torch.nn.modules.dropout import _DropoutNd
 class ProG_VECR(VECR):
     def __init__(self, **cfg):
         super(ProG_VECR, self).__init__(**cfg)
-        self.ignore_index = cfg['proto']['ignore_index']
         self.proto_cfg = cfg['proto']
         self.proto_resume = cfg['proto_resume']
         self.pseudo_threshold = None
 
+        assert self.num_classes == self.proto_cfg['num_class']
+        assert self.ignore_index == self.proto_cfg['ignore_index']
         self.feat_estimator = None
 
-        self.stylization = cfg['stylize']
         assert cfg['stylize'].get('source', None)
         assert cfg['stylize'].get('target', None)
+        self.stylization = cfg['stylize']
+
+        self.src_inv_lambda = self.stylization['inv_loss']['weight']
+        self.tgt_inv_lambda = self.stylization['inv_loss']['weight_target']
+        mmcv.print_log(
+            f'src_inv_lambda: {self.src_inv_lambda}, tgt_inv_lambda: {self.tgt_inv_lambda}',
+            'mmseg',
+        )
 
     def update_prototype_statistics(self, src_img, tgt_img, src_label, tgt_label):
         src_emafeat = self.get_ema_model().extract_bottlefeat(src_img)
@@ -72,31 +80,33 @@ class ProG_VECR(VECR):
         self.feat_estimator.update(feat=tgt_emafeat.detach(), label=tgt_mask)
         self.feat_estimator.update(feat=src_emafeat.detach(), label=src_mask)
 
-    def estimate_pseudo_confidence(self, proto, feat):
+    def estimate_pseudo_weight(self, proto, feat, pseudo_lbl):
         """
         Args:
             C means NUM_CLASS, A means feature dim.
 
             proto: shape of (C, A), the mean representation of each class.
             feat: shape of (B, A, H, W).
+            pseudo_lbl: shape of (B, H, W)
 
             Return: pixel-wise pseudo confidence, which is shape of (B, H, W)
         """
         b, a, h, w = feat.shape
         c, _ = proto.shape
+        assert pseudo_lbl.shape == (b, h, w)
 
         feat = feat.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
         feat = F.normalize(feat, p=2, dim=1)
         proto = F.normalize(proto, p=2, dim=1)
 
         weight = feat @ proto.permute(1, 0).contiguous()
-        weight = weight.softmax(dim=1)
+        weight = weight.softmax(dim=1).view(b, h, w, c).permute(0, 3, 1, 2)
 
-        weight = weight.view(b, h, w, c).permute(0, 3, 1, 2)
+        pseudo_weight = weight.gather(1, pseudo_lbl.unsqueeze(1))
 
-        return torch.argmax(weight, dim=1)
+        return pseudo_weight.squeeze(1)
 
-    def calculate_feat_invariance(self, f1, f2, proto, dev):
+    def calculate_feat_invariance(self, f1, f2, proto, source):
         """
         Args:
             C means NUM_CLASS, A means feature dim.
@@ -108,28 +118,22 @@ class ProG_VECR(VECR):
         """
         assert f1.shape == f2.shape
         b, a, h, w = f1.shape
-        f1_dis = torch.zeros((b, self.num_classes, h, w), device=dev)
-        f2_dis = torch.zeros((b, self.num_classes, h, w), device=dev)
-        for i in range(self.num_classes):
-            f1_dis[:, i, :, :] = torch.norm(
-                proto[i].contiguous().view(-1, 1, 1).expand(-1, h, w) - f1,
-                p=2,
-                dim=1,
-            )
-            f2_dis[:, i, :, :] = torch.norm(
-                proto[i].contiguous().view(-1, 1, 1).expand(-1, h, w) - f2,
-                p=2,
-                dim=1,
-            )
 
-        item1 = F.kl_div(
-            f1_dis.log_softmax(dim=1), f2_dis.softmax(dim=1), reduction='mean'
-        )
-        item2 = F.kl_div(
-            f2_dis.log_softmax(dim=1), f1_dis.softmax(dim=1), reduction='mean'
-        )
-        inv_loss = 0.5 * item1 + 0.5 * item2
-        inv_loss, inv_log = self._parse_losses({'loss_feat_inv': inv_loss})
+        f1 = f1.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
+        f1 = F.normalize(f1, p=2, dim=1)
+        f2 = f2.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
+        f2 = F.normalize(f2, p=2, dim=1)
+        proto = F.normalize(proto, p=2, dim=1)
+
+        f1_dis = f1 @ proto.permute(1, 0).contiguous()
+        f2_dis = f2 @ proto.permute(1, 0).contiguous()
+
+        item1 = F.kl_div(f1_dis.log_softmax(1), f2_dis.softmax(1), reduction='mean')
+        item2 = F.kl_div(f2_dis.log_softmax(1), f1_dis.softmax(1), reduction='mean')
+        item = (item1 + item2) / 2.0
+
+        item *= self.src_inv_lambda if source else self.tgt_inv_lambda
+        inv_loss, inv_log = self._parse_losses({'loss_feat_inv': item})
         inv_log.pop('loss', None)
         return inv_loss, inv_log
 
@@ -144,7 +148,7 @@ class ProG_VECR(VECR):
             self._init_ema_weights()
             # assert _params_equal(self.get_ema_model(), self.get_model())
             self.feat_estimator = prototype_dist_estimator(
-                self.proto_cfg, class_num=self.num_classes, resume=self.proto_resume
+                self.proto_cfg, resume=self.proto_resume
             )
 
         if self.local_iter > 0:
@@ -238,7 +242,7 @@ class ProG_VECR(VECR):
                 src_feat,
                 src_style_feat,
                 proto=self.feat_estimator.Proto.detach(),
-                dev=dev,
+                source=True,
             )
             log_vars.update(add_prefix(src_inv_log, 'src'))
             src_inv_loss.backward()
@@ -254,30 +258,22 @@ class ProG_VECR(VECR):
         tgtema_logits, tgtema_feat = tgt_outputs['out'], tgt_outputs['feat']
         tgt_softmax = torch.softmax(tgtema_logits.detach(), dim=1)
         pseudo_label = torch.argmax(tgt_softmax, dim=1)
-        # calculate pseudo weight
-        pseudo_cfd = self.estimate_pseudo_confidence(
-            proto=self.feat_estimator.Proto.detach(), feat=tgtema_feat.detach()
-        )
-        ps_equal_cfd = pseudo_label.eq(pseudo_cfd).long() == 1
-        ps_size = np.size(np.array(pseudo_label.cpu()))
-        pseudo_weight = torch.sum(ps_equal_cfd).item() / ps_size
-        pseudo_weight = pseudo_weight * torch.ones(pseudo_label.shape, device=dev)
-        gt_pixel_weight = torch.ones(pseudo_weight.shape, device=dev)
-        # fmt: off
-        del (
-            tgt_outputs, tgtema_logits, tgtema_feat, tgt_softmax, 
-            pseudo_cfd, ps_equal_cfd, ps_size
-        )
-        # fmt: on
-
         # update feature statistics
         tgt_ps_semantic_seg = pseudo_label.clone().unsqueeze(1)
         tgt_ps_semantic_seg[
-            torch.ne(pseudo_label, tgt_gt_semantic_seg)
+            torch.ne(tgt_ps_semantic_seg, tgt_gt_semantic_seg)
         ] = self.ignore_index
         self.update_prototype_statistics(
             src_img, tgt_img, src_gt_semantic_seg, tgt_ps_semantic_seg
         )
+        # estimate pseudo weight
+        pseudo_weight = self.estimate_pseudo_weight(
+            proto=self.feat_estimator.Proto.detach(),
+            feat=tgtema_feat.detach(),
+            pseudo_lbl=pseudo_label,
+        )
+        gt_pixel_weight = torch.ones(pseudo_weight.shape, device=dev)
+        del tgt_outputs, tgtema_logits, tgtema_feat, tgt_softmax
 
         # prepare for dacs transforms
         strong_parameters = {
@@ -377,7 +373,7 @@ class ProG_VECR(VECR):
                 list(feats_pool.values())[0],
                 list(feats_pool.values())[1],
                 proto=self.feat_estimator.Proto.detach(),
-                dev=dev,
+                source=False,
             )
             log_vars.update(add_prefix(tgt_inv_log, 'tgt'))
             tgt_inv_loss.backward()
@@ -436,7 +432,9 @@ class ProG_VECR(VECR):
                 _, tgt_ema_fb_label = torch.max(tgt_softmax, dim=1)
                 tgt_ema_fb_label = tgt_ema_fb_label.unsqueeze(1)
                 # mixed label pred
-                mix_logits = self.get_model().encode_decode(mixed_img[0], tgt_img_metas)
+                mix_logits = self.get_model().encode_decode(
+                    mixed_img[0], tgt_img_metas
+                )
                 mix_softmax = torch.softmax(mix_logits.detach(), dim=1)
                 _, mix_label_test = torch.max(mix_softmax, dim=1)
                 mix_label_test = mix_label_test.unsqueeze(1)
