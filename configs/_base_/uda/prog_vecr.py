@@ -23,7 +23,7 @@ uda = dict(
         inv_loss=dict(
             # Feature invariance loss weights set to 50 for source Cityscapes domain and 20 for target ACDC domain.
             weight=50.0,
-            weight_target=20.0
+            weight_target=30.0
         )),
     proto_resume='pretrained/prototype_source_initial_value.pth'
 )

@@ -106,27 +106,44 @@ class ProG_VECR(VECR):
 
         return pseudo_weight.squeeze(1)
 
-    def calculate_feat_invariance(self, f1, f2, proto, source):
+    def calculate_feat_invariance(self, f1, f2, proto, source, cos_similar=True):
         """
         Args:
             C means NUM_CLASS, A means feature dim.
 
             proto: shape of (C, A), the mean representation of each class.
             feat: shape of (B, A, H, W).
+            source: loss domain flag.
+            cos_similar: calculate invariance method.
 
             Return: feature invariance loss.
         """
         assert f1.shape == f2.shape
         b, a, h, w = f1.shape
 
-        f1 = f1.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
-        f1 = F.normalize(f1, p=2, dim=1)
-        f2 = f2.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
-        f2 = F.normalize(f2, p=2, dim=1)
-        proto = F.normalize(proto, p=2, dim=1)
+        if cos_similar:
+            f1 = f1.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
+            f1 = F.normalize(f1, p=2, dim=1)
+            f2 = f2.permute(0, 2, 3, 1).contiguous().view(b * h * w, a)
+            f2 = F.normalize(f2, p=2, dim=1)
+            proto = F.normalize(proto, p=2, dim=1)
 
-        f1_dis = f1 @ proto.permute(1, 0).contiguous()
-        f2_dis = f2 @ proto.permute(1, 0).contiguous()
+            f1_dis = f1 @ proto.permute(1, 0).contiguous()
+            f2_dis = f2 @ proto.permute(1, 0).contiguous()
+        else:
+            f1_dis = torch.zeros((b, self.num_classes, h, w)).cuda()
+            f2_dis = torch.zeros((b, self.num_classes, h, w)).cuda()
+            for i in range(self.num_classes):
+                f1_dis[:, i, :, :] = torch.norm(
+                    proto[i].contiguous().view(-1, 1, 1).expand(-1, h, w) - f1,
+                    p=2,
+                    dim=1,
+                )
+                f2_dis[:, i, :, :] = torch.norm(
+                    proto[i].contiguous().view(-1, 1, 1).expand(-1, h, w) - f2,
+                    p=2,
+                    dim=1,
+                )
 
         item1 = F.kl_div(f1_dis.log_softmax(1), f2_dis.softmax(1), reduction='mean')
         item2 = F.kl_div(f2_dis.log_softmax(1), f1_dis.softmax(1), reduction='mean')
