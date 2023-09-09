@@ -67,7 +67,7 @@ def amplitude_mixup(img1, img2, ratio):
 
     img1_amp_, img2_amp_ = torch.clone(img1_amp), torch.clone(img2_amp)
     img1_amp[..., h1:h2, w1:w2] = (
-        0.3 * img2_amp_[..., h1:h2, w1:w2] + (1 - 0.3) * img1_amp_[..., h1:h2, w1:w2]
+        0.7 * img2_amp_[..., h1:h2, w1:w2] + (1 - 0.7) * img1_amp_[..., h1:h2, w1:w2]
     )
 
     img1_amp = ifftshift(img1_amp, dim=(-2, -1))

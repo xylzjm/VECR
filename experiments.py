@@ -369,8 +369,8 @@ def generate_experiment_cfgs(id):
         pretrained_source = 'pretrained/source_warmup_daformer.pth'
         seeds = [0]
         models = [
-            ('daformer_sepaspp_logit_constraint', 'mitb5'),
-            # ('daformer_sepaspp', 'mitb5'),
+            # ('daformer_sepaspp_logit_constraint', 'mitb5'),
+            ('daformer_sepaspp', 'mitb5'),
         ]
         datasets = [
             ('cityscapes', 'acdc')

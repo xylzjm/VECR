@@ -100,13 +100,20 @@ class ProG_VECR(VECR):
         proto = F.normalize(proto, p=2, dim=1)
 
         weight = feat @ proto.permute(1, 0).contiguous()
-        weight = weight.softmax(dim=1).view(b, h, w, c).permute(0, 3, 1, 2)
+        weight = F.normalize(weight, p=2, dim=1).view(b, h, w, c).permute(0, 3, 1, 2)
 
         pseudo_weight = weight.gather(1, pseudo_lbl.unsqueeze(1))
 
         return pseudo_weight.squeeze(1)
 
-    def calculate_feat_invariance(self, f1, f2, proto, source, cos_similar=True):
+    def calculate_feature_invariance(self, feat_input, feat_ref, source):
+        feat_dist = F.mse_loss(feat_input, feat_ref, reduction='mean')
+        feat_dist *= self.src_inv_lambda if source else self.tgt_inv_lambda
+        inv_loss, inv_log = self._parse_losses({'loss_feat_inv': feat_dist})
+        inv_log.pop('loss', None)
+        return inv_loss, inv_log
+
+    def calculate_feat_consistency(self, f1, f2, proto, source, cos_similar=True):
         """
         Args:
             C means NUM_CLASS, A means feature dim.
@@ -200,7 +207,7 @@ class ProG_VECR(VECR):
         tgt_fb_img, src_fb_img = [None] * batch_size, [None] * batch_size
         for i in range(batch_size):
             tgt_fb_img[i] = fourier_transform(
-                data=torch.stack((tgt_ib_img[i], src_img[i])),
+                data=torch.stack((tgt_img[i], src_img[i])),
                 mean=means[0].unsqueeze(0),
                 std=stds[0].unsqueeze(0),
             )
@@ -211,7 +218,7 @@ class ProG_VECR(VECR):
             )
         tgt_fb_img = torch.cat(tgt_fb_img)
         src_fb_img = torch.cat(src_fb_img)
-        del tgt_ib_img
+        # del tgt_ib_img
 
         # train main model with source
         if (
@@ -255,10 +262,9 @@ class ProG_VECR(VECR):
 
         # feature invariance loss between original and stylized versions of source images.
         if self.stylization['source']['consist']:
-            src_inv_loss, src_inv_log = self.calculate_feat_invariance(
+            src_inv_loss, src_inv_log = self.calculate_feature_invariance(
                 src_feat,
                 src_style_feat,
-                proto=self.feat_estimator.Proto.detach(),
                 source=True,
             )
             log_vars.update(add_prefix(src_inv_log, 'src'))
@@ -270,7 +276,7 @@ class ProG_VECR(VECR):
 
         # generate target pseudo label from ema model
         tgt_outputs = self.get_ema_model().encode_decode_bottlefeat(
-            tgt_fb_img, tgt_img_metas
+            tgt_ib_img, tgt_img_metas
         )
         tgtema_logits, tgtema_feat = tgt_outputs['out'], tgt_outputs['feat']
         tgt_softmax = torch.softmax(tgtema_logits.detach(), dim=1)
@@ -388,10 +394,9 @@ class ProG_VECR(VECR):
                     feats_pool[con_args] = self.get_model().extract_bottlefeat(mixed_img_)
                     # fmt: on
             assert len(feats_pool) == len(self.stylization['target']['consist'])
-            tgt_inv_loss, tgt_inv_log = self.calculate_feat_invariance(
+            tgt_inv_loss, tgt_inv_log = self.calculate_feature_invariance(
                 feats_pool[self.stylization['target']['consist'][0]],
                 feats_pool[self.stylization['target']['consist'][1]],
-                proto=self.feat_estimator.Proto.detach(),
                 source=False,
             )
             log_vars.update(add_prefix(tgt_inv_log, 'tgt'))
@@ -407,10 +412,13 @@ class ProG_VECR(VECR):
             os.makedirs(out_dir, exist_ok=True)
             vis_src_img = torch.clamp(denorm(src_img, means, stds), 0, 1)
             vis_tgt_img = torch.clamp(denorm(tgt_img, means, stds), 0, 1)
-            vis_mix_img = torch.clamp(denorm(mixed_img[0], means, stds), 0, 1)
             vis_src_fb_img = torch.clamp(denorm(src_fb_img, means, stds), 0, 1)
             vis_tgt_fb_img = torch.clamp(denorm(tgt_fb_img, means, stds), 0, 1)
-            vis_mix_fb_img = torch.clamp(denorm(mixed_img_, means, stds), 0, 1)
+            vis_mix_img = torch.clamp(denorm(mixed_img[0], means, stds), 0, 1)
+            if len(mixed_img) < 2:
+                vis_mix_fb_img = torch.clamp(denorm(mixed_img_, means, stds), 0, 1)
+            else:
+                vis_mix_fb_img = torch.clamp(denorm(mixed_img[1], means, stds), 0, 1)
             with torch.no_grad():
                 # source pseudo label
                 src_logits = self.get_model().encode_decode(src_img, src_img_metas)
@@ -457,13 +465,22 @@ class ProG_VECR(VECR):
                 mix_softmax = torch.softmax(mix_logits.detach(), dim=1)
                 _, mix_label_test = torch.max(mix_softmax, dim=1)
                 mix_label_test = mix_label_test.unsqueeze(1)
-                # mixed fb label pred
-                mix_logits = self.get_model().encode_decode(
-                    mixed_img_, tgt_img_metas
-                )
-                mix_softmax = torch.softmax(mix_logits.detach(), dim=1)
-                _, mix_fb_label_test = torch.max(mix_softmax, dim=1)
-                mix_fb_label_test = mix_fb_label_test.unsqueeze(1)
+                if len(mixed_img) < 2:
+                    # mixed fb label pred
+                    mix_logits = self.get_model().encode_decode(
+                        mixed_img_, tgt_img_metas
+                    )
+                    mix_softmax = torch.softmax(mix_logits.detach(), dim=1)
+                    _, mix_fb_label_test = torch.max(mix_softmax, dim=1)
+                    mix_fb_label_test = mix_fb_label_test.unsqueeze(1)
+                else:
+                    # mixed fb label pred
+                    mix_logits = self.get_model().encode_decode(
+                        mixed_img[1], tgt_img_metas
+                    )
+                    mix_softmax = torch.softmax(mix_logits.detach(), dim=1)
+                    _, mix_fb_label_test = torch.max(mix_softmax, dim=1)
+                    mix_fb_label_test = mix_fb_label_test.unsqueeze(1)
             # fmt: off
             del (src_logits, src_softmax, tgt_logits,
                  tgt_softmax, mix_logits, mix_softmax)
